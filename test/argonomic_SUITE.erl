@@ -15,6 +15,7 @@
 
 %% Test cases
 -export([
+         t_unknown_sub_cmd/1,
          t_unknown_arg/1,
          t_arg_types/1
         ]).
@@ -68,6 +69,21 @@ end_per_testcase(_TestCaseName, _Config) ->
 %%% mandatory arg missing
 %%% Print description
 %%% Constraint
+t_unknown_sub_cmd(_Config) ->
+    %% Arrange
+    SubCmdName = some_sub_cmd,
+    SubCmd = new_sub_cmd_spec(SubCmdName),
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+
+    %% Act
+    Args = ["some_unknown_sub_command",
+            "-atom_arg", "some_atom"
+           ],
+    Result = (catch argonomic:parse(CmdSpec, Args)),
+    
+    %% Assert
+    ?assertEqual({'EXIT', unknown_sub_command}, Result).
+
 t_unknown_arg(_Config) ->
     %% Arrange
     SubCmdName1 = some_sub_cmd1,
