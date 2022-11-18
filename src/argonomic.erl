@@ -92,11 +92,11 @@ parse_args(SubCmdSpec, ArgStrs) ->
 
 parse_args_help(_SubCmdSpec, _ArgStrs=[], ParsedResult) ->
     lists:reverse(ParsedResult);
-parse_args_help(SubCmdSpec, _ArgStrs=[[$-|ArgStr], Next | Rest], ParsedResult) ->
+parse_args_help(SubCmdSpec, _ArgStrs=[[$-|ArgStr] | Rest], ParsedResult) ->
     ArgName = list_to_atom(ArgStr),
     ArgSpec = get_mandatory_val(ArgName, SubCmdSpec#sub_command.args, unknown_arg),
-    NewParsedResult = [parse_value(ArgSpec, Next) | ParsedResult],
-    parse_args_help(SubCmdSpec, Rest, NewParsedResult).
+    {ParsedArg, NewRest} = parse_value(ArgSpec, Rest),
+    parse_args_help(SubCmdSpec, NewRest, [ParsedArg | ParsedResult]).
 
 %%------------------------------------------------------------------------------
 -spec get_mandatory_val(Key, Map, ErrorMsg) -> Value | no_return() when
@@ -115,14 +115,18 @@ get_mandatory_val(Key, Map, ErrorMsg) ->
     end.
 
 %%------------------------------------------------------------------------------
--spec parse_value(#arg{}, NextStr::string()) -> proplists:property().
+-spec parse_value(#arg{}, Args::[string()]) -> {proplists:property(), Rest::[string()]}.
 %%------------------------------------------------------------------------------
-parse_value(#arg{name=Name, type=Type}, NextStr) ->
-    case Type of
-        flag    -> Name;
-        boolean -> {Name, list_to_atom(NextStr)}
-    end.
-
+parse_value(#arg{name=FlagName, type=flag}, Rest) ->
+    {FlagName, Rest};
+parse_value(#arg{name=Name, type=Type}, [Next | Rest]) ->
+    Value = case Type of
+                boolean -> list_to_atom(Next);
+                string  -> Next;
+                atom    -> list_to_atom(Next);
+                integer -> list_to_integer(Next)
+            end,
+    {{Name, Value}, Rest}.
 
     
 

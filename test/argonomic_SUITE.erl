@@ -15,7 +15,7 @@
 
 %% Test cases
 -export([
-         t_parse/1
+         t_arg_types/1
         ]).
 
 
@@ -69,16 +69,40 @@ end_per_testcase(_TestCaseName, _Config) ->
 %%% mandatory arg missing
 %%% Print help message
 %%%
-t_parse(_Config) ->
-    Arg1 = argonomic:new_arg(_ArgName=arg1, _Type=boolean, _IsMandatory=true),
-    SubCmd = argonomic:new_sub_cmd(_SubCmdName = sub_cmd1),
-    NewSubCmd = argonomic:add_arg(SubCmd, Arg1),
+t_arg_types(_Config) ->
+    %% Arrange
+    SubCmd = lists:foldl(fun({ArgName, Type}, SubCmd) ->
+                             Arg = argonomic:new_arg(ArgName, Type, _IsMandatory=true),
+                             argonomic:add_arg(SubCmd, Arg)
+                         end,
+                         _AccIn=argonomic:new_sub_cmd(sub_cmd1),
+                         [{atom_arg, atom},
+                          {boolean_arg, boolean},
+                          {flag_arg, flag},
+                          {string_arg, string},
+                          {integer_arg, integer}
+                         ]
+                        ),
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
 
-    Cmd = argonomic:new_cmd(),
-    NewCmd = argonomic:add_sub_cmd(Cmd, NewSubCmd),
+    %% Act
+    Args = ["sub_cmd1",
+            "-string_arg", "hello world",
+            "-boolean_arg", "true",
+            "-atom_arg", "some_atom",
+            "-flag_arg",
+            "-integer_arg", "1234"
+           ],
+    Result = argonomic:parse(CmdSpec, Args),
 
-    Args = ["sub_cmd1", "-arg1", "true"],
-    Result = argonomic:parse(NewCmd, Args),
-    ?assertEqual({sub_cmd1, [{arg1, true}]}, Result).
+    %% Assert
+    ?assertEqual({sub_cmd1, [{string_arg, "hello world"},
+                             {boolean_arg, true},
+                             {atom_arg, some_atom},
+                             flag_arg,
+                             {integer_arg, 1234}
+                            ]},
+                 Result
+                ).
 
 
