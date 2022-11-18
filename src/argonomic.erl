@@ -1,33 +1,127 @@
 -module(argonomic).
 
--type command_spec() :: [sub_command_spec()].
--type sub_command_spec() :: {SubCmdName::atom(), [arg_spec()]}.
--type arg_spec() :: {Name::atom(), Type::value_type(), Mandatory::boolean(), Constraint::fun((Value::term())-> boolean())}.
--type value_type() :: atom | boolean | string | integer | flag.
+%% -----------------------------------------------------------------------------
+%% Exports
+%% -----------------------------------------------------------------------------
+-export([
+         new_cmd/0,
+         new_sub_cmd/1,
+         add_sub_cmd/2,
+         new_arg/3,
+         add_arg/2,
+         parse/2
+        ]).
 
--export([parse/2]).
+%% -----------------------------------------------------------------------------
+%% Definitions
+%% -----------------------------------------------------------------------------
+-record(arg, {name         :: arg_name(),
+              type         :: arg_type(),
+              is_mandatory :: boolean()
+             }).
+
+-record(sub_command, {name :: sub_command_name(),
+                      args :: arg_specs()
+                     }).
+
+-type arg_name()         :: atom().
+-type sub_command_name() :: atom().
+
+-type command() :: #{sub_command_name() => #sub_command{}}.
+
+-type arg_specs() :: #{arg_name() => #arg{}}.
+
+-type arg_type() :: value_type() |
+                    {value_type(), Constraint::fun((Value::term())-> boolean())} |
+                    flag.
+
+-type value_type() :: atom | boolean | string | integer.
+
+%% -----------------------------------------------------------------------------
+%% Externally Exported Functions
+%% -----------------------------------------------------------------------------
 
 %%------------------------------------------------------------------------------
--spec parse(command_spec(), Args::[string()]) -> proplists:proplist().
+-spec new_cmd() -> command().
+%%------------------------------------------------------------------------------
+new_cmd() ->
+    maps:new().
+
+%%------------------------------------------------------------------------------
+-spec new_sub_cmd(sub_command_name()) -> #sub_command{}.
+%%------------------------------------------------------------------------------
+new_sub_cmd(Name) ->
+    #sub_command{name=Name, args=maps:new()}.
+
+%%------------------------------------------------------------------------------
+-spec add_sub_cmd(command(), #sub_command{}) -> command().
+%%------------------------------------------------------------------------------
+add_sub_cmd(Cmd, #sub_command{name=Name} = SubCmd) ->
+    maps:put(Name, SubCmd, Cmd).
+
+%%------------------------------------------------------------------------------
+-spec new_arg(arg_name(), arg_type(), IsMandatory::boolean()) -> #arg{}.
+%%------------------------------------------------------------------------------
+new_arg(Name, Type, IsMandatory) ->
+    #arg{name=Name, type=Type, is_mandatory=IsMandatory}.
+
+%%------------------------------------------------------------------------------
+-spec add_arg(#sub_command{}, #arg{}) -> #sub_command{}.
+%%------------------------------------------------------------------------------
+add_arg(#sub_command{args=Args} = SubCmd, #arg{name=ArgName} = Arg) ->
+    SubCmd#sub_command{args=maps:put(ArgName, Arg, Args)}.
+
+%%------------------------------------------------------------------------------
+-spec parse(command(), Args::[string()]) -> {sub_command_name(), proplists:proplist()}.
 %%------------------------------------------------------------------------------
 parse(CmdSpec, [SubCmdStr|ArgStrs]) ->
-    SubCmd = list_to_atom(SubCmdStr),
-    ArgSpecs = proplists:get_value(SubCmd, CmdSpec),
-    ParsedArgs = parse_args(ArgSpecs, ArgStrs),
-    {SubCmd, ParsedArgs}.
+    SubCmdName = list_to_atom(SubCmdStr),
+    SubCmdSpec = get_mandatory_val(SubCmdName, CmdSpec, unknown_sub_command),
+    ParsedArgs = parse_args(SubCmdSpec, ArgStrs),
+    {SubCmdName, ParsedArgs}.
 
-parse_args(ArgSpecs, ArgStrs) ->
-    parse_args_help(ArgSpecs, ArgStrs, _ParsedResult=[]).
+%% -----------------------------------------------------------------------------
+%% Internal Functions
+%% -----------------------------------------------------------------------------
+ 
+%%------------------------------------------------------------------------------
+-spec parse_args(#sub_command{}, Args::[string()]) -> proplists:proplist().
+%%------------------------------------------------------------------------------
+parse_args(SubCmdSpec, ArgStrs) ->
+    parse_args_help(SubCmdSpec, ArgStrs, _ParsedResult=[]).
 
-parse_args_help(_ArgSpecs, _ArgStrs=[], ParsedResult) ->
+parse_args_help(_SubCmdSpec, _ArgStrs=[], ParsedResult) ->
     lists:reverse(ParsedResult);
-parse_args_help(ArgSpecs, _ArgStrs=[[$-|ArgStr], Next | Rest], ParsedResult) ->
-    {ArgName, _Type, _Mandatory, _Constraint} = lists:keyfind(list_to_atom(ArgStr), 1, ArgSpecs),
-    Value = list_to_atom(Next),
-    NewParsedResult = [{ArgName, Value} | ParsedResult],
-    parse_args_help(ArgSpecs, Rest, NewParsedResult).
+parse_args_help(SubCmdSpec, _ArgStrs=[[$-|ArgStr], Next | Rest], ParsedResult) ->
+    ArgName = list_to_atom(ArgStr),
+    ArgSpec = get_mandatory_val(ArgName, SubCmdSpec#sub_command.args, unknown_arg),
+    NewParsedResult = [parse_value(ArgSpec, Next) | ParsedResult],
+    parse_args_help(SubCmdSpec, Rest, NewParsedResult).
 
+%%------------------------------------------------------------------------------
+-spec get_mandatory_val(Key, Map, ErrorMsg) -> Value | no_return() when
+      Key      :: term(),
+      Map      :: #{Key => Value},
+      ErrorMsg :: term(),
+      Value    :: term().
+%%------------------------------------------------------------------------------
+get_mandatory_val(Key, Map, ErrorMsg) ->
+    case maps:get(Key, Map, ErrorMsg) of
+        ErrorMsg ->
+            io:format("Error - ~p: ~p.~n", [ErrorMsg, Key]),
+            exit(ErrorMsg);
+        Value ->
+            Value
+    end.
 
+%%------------------------------------------------------------------------------
+-spec parse_value(#arg{}, NextStr::string()) -> proplists:property().
+%%------------------------------------------------------------------------------
+parse_value(#arg{name=Name, type=Type}, NextStr) ->
+    case Type of
+        flag    -> Name;
+        boolean -> {Name, list_to_atom(NextStr)}
+    end.
 
 
     
