@@ -17,11 +17,13 @@
 %% -----------------------------------------------------------------------------
 -record(arg, {name         :: arg_name(),
               type         :: arg_type(),
-              is_mandatory :: boolean()
+              is_mandatory :: boolean(),
+              description  :: string()
              }).
 
--record(sub_command, {name :: sub_command_name(),
-                      args :: arg_specs()
+-record(sub_command, {name        :: sub_command_name(),
+                      args        :: arg_specs(),
+                      description :: string()
                      }).
 
 -type arg_name()         :: atom().
@@ -54,8 +56,13 @@ new_sub_cmd(Name) ->
     #sub_command{name=Name, args=maps:new()}.
 
 %%------------------------------------------------------------------------------
--spec add_sub_cmd(command(), #sub_command{}) -> command().
+-spec add_sub_cmd(command(), #sub_command{} | [#sub_command{}]) -> command().
 %%------------------------------------------------------------------------------
+add_sub_cmd(Cmd, _SubCmds=[]) ->
+    Cmd;
+add_sub_cmd(Cmd, [SubCmd | Rest]) ->
+    NewCmd = add_sub_cmd(Cmd, SubCmd),
+    add_sub_cmd(NewCmd, Rest);
 add_sub_cmd(Cmd, #sub_command{name=Name} = SubCmd) ->
     maps:put(Name, SubCmd, Cmd).
 
@@ -66,8 +73,13 @@ new_arg(Name, Type, IsMandatory) ->
     #arg{name=Name, type=Type, is_mandatory=IsMandatory}.
 
 %%------------------------------------------------------------------------------
--spec add_arg(#sub_command{}, #arg{}) -> #sub_command{}.
+-spec add_arg(#sub_command{}, #arg{} | [#arg{}]) -> #sub_command{}.
 %%------------------------------------------------------------------------------
+add_arg(SubCmd, _Args=[]) ->
+    SubCmd;
+add_arg(SubCmd, [Arg | Rest]) ->
+    NewSubCmd = add_arg(SubCmd, Arg),
+    add_arg(NewSubCmd, Rest);
 add_arg(#sub_command{args=Args} = SubCmd, #arg{name=ArgName} = Arg) ->
     SubCmd#sub_command{args=maps:put(ArgName, Arg, Args)}.
 
