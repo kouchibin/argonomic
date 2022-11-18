@@ -15,6 +15,7 @@
 
 %% Test cases
 -export([
+         t_no_arg/1,
          t_unknown_sub_cmd/1,
          t_unknown_arg/1,
          t_arg_types/1
@@ -63,16 +64,26 @@ end_per_testcase(_TestCaseName, _Config) ->
 %%% Test Cases
 %%% ============================================================================
 %%% TODO 
-%%% unknown subcommand
 %%% duplicated args
-%%% subcommand with no args
 %%% mandatory arg missing
 %%% Print description
 %%% Constraint
-t_unknown_sub_cmd(_Config) ->
+t_no_arg(_Config) ->
     %% Arrange
     SubCmdName = some_sub_cmd,
-    SubCmd = new_sub_cmd_spec(SubCmdName),
+    SubCmd = argonomic:new_sub_cmd(some_sub_cmd),
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+
+    %% Act
+    Args = ["some_sub_cmd"],
+    Result = argonomic:parse(CmdSpec, Args),
+
+    %% Assert
+    ?assertEqual({SubCmdName, []}, Result).
+
+t_unknown_sub_cmd(_Config) ->
+    %% Arrange
+    SubCmd = new_sub_cmd_spec(some_sub_cmd),
     CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
 
     %% Act
