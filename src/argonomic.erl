@@ -97,18 +97,41 @@ parse(CmdSpec, [SubCmdStr|ArgStrs]) ->
 %% -----------------------------------------------------------------------------
  
 %%------------------------------------------------------------------------------
--spec parse_args(#sub_command{}, Args::[string()]) -> proplists:proplist().
+-spec parse_args(#sub_command{}, Args::[string()]) -> proplists:proplist() | no_return().
 %%------------------------------------------------------------------------------
 parse_args(SubCmdSpec, ArgStrs) ->
     parse_args_help(SubCmdSpec, ArgStrs, _ParsedResult=[]).
 
-parse_args_help(_SubCmdSpec, _ArgStrs=[], ParsedResult) ->
+%%------------------------------------------------------------------------------
+parse_args_help(#sub_command{args=ArgSpecs}, _ArgStrs=[], ParsedResult) ->
+    check_if_missing_mandatory_arg(ArgSpecs),
     lists:reverse(ParsedResult);
 parse_args_help(SubCmdSpec, _ArgStrs=[[$-|ArgStr] | Rest], ParsedResult) ->
     ArgName = list_to_atom(ArgStr),
-    ArgSpec = get_mandatory_val(ArgName, SubCmdSpec#sub_command.args, unknown_arg),
+    ArgSpecs = SubCmdSpec#sub_command.args,
+    ArgSpec = get_mandatory_val(ArgName, ArgSpecs, unknown_arg),
     {ParsedArg, NewRest} = parse_value(ArgSpec, Rest),
-    parse_args_help(SubCmdSpec, NewRest, [ParsedArg | ParsedResult]).
+    RemainingArgSpecs = maps:remove(ArgName, ArgSpecs),
+    parse_args_help(SubCmdSpec#sub_command{args=RemainingArgSpecs},
+                    NewRest,
+                    [ParsedArg | ParsedResult]
+                   ).
+
+%%------------------------------------------------------------------------------
+check_if_missing_mandatory_arg(ArgSpecs) ->
+    lists:foreach(
+      fun({ArgName, #arg{is_mandatory=IsMandatory}}) ->
+               case IsMandatory of
+                   true ->
+                     Reason = missing_mandatory_arg,
+                     io:format("Error - ~p: ~p.~n", [Reason, ArgName]),
+                     exit({Reason, ArgName});
+                   false ->
+                       ok
+               end
+       end,
+       maps:to_list(ArgSpecs)
+      ).
 
 %%------------------------------------------------------------------------------
 -spec get_mandatory_val(Key, Map, ErrorMsg) -> Value | no_return() when

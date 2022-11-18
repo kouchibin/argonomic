@@ -18,7 +18,8 @@
          t_no_arg/1,
          t_unknown_sub_cmd/1,
          t_unknown_arg/1,
-         t_arg_types/1
+         t_arg_types/1,
+         t_missing_mandatory_arg/1
         ]).
 
 
@@ -71,7 +72,7 @@ end_per_testcase(_TestCaseName, _Config) ->
 t_no_arg(_Config) ->
     %% Arrange
     SubCmdName = some_sub_cmd,
-    SubCmd = argonomic:new_sub_cmd(some_sub_cmd),
+    SubCmd = argonomic:new_sub_cmd(SubCmdName),
     CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
 
     %% Act
@@ -158,4 +159,16 @@ t_arg_types(_Config) ->
                  Result
                 ).
 
+t_missing_mandatory_arg(_Config) ->
+    %% Arrange
+    ArgName = some_arg_name,
+    MandatoryArg = argonomic:new_arg(ArgName, atom, _IsMandatory=true),
+    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(some_sub_cmd), MandatoryArg),
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
 
+    %% Act
+    Args = ["some_sub_cmd"],
+    Result = (catch argonomic:parse(CmdSpec, Args)),
+
+    %% Assert
+    ?assertEqual({'EXIT', {missing_mandatory_arg, ArgName}}, Result).
