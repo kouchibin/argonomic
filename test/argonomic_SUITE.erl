@@ -58,10 +58,37 @@ all_test_cases() ->
                 ).
 
 init_per_testcase(_TestCaseName, Config) ->
-    Config.
+    [{cmd_spec, new_cmd_spec()} | Config].
 
 end_per_testcase(_TestCaseName, _Config) ->
     ok.
+
+new_cmd_spec() ->
+    Cmd1Args = [{atom_arg, {atom,fun(Value) -> lists:member(Value, [a,b,c]) end}, true},
+                {boolean_arg, boolean, false},
+                {flag_arg, flag, true},
+                {string_arg, string, false},
+                {integer_arg, integer, true}
+               ],
+    SubCmd1 = new_sub_cmd_spec(sub_cmd1, Cmd1Args),
+
+    Cmd2Args = [{boolean_arg, boolean, false},
+                {integer_arg, {integer, fun(Value) -> Value >= 10 end}, true}
+               ],
+    SubCmd2 = new_sub_cmd_spec(sub_cmd2, Cmd2Args),
+
+    SubCmd3 = new_sub_cmd_spec(sub_cmd3, _NoArgs=[]),
+
+    argonomic:add_sub_cmd(argonomic:new_cmd(), [SubCmd1, SubCmd2, SubCmd3]).
+
+new_sub_cmd_spec(SubCmdName, ArgSpecList) ->
+    lists:foldl(fun({ArgName, Type, IsMandatory}, SubCmd) ->
+                    Arg = argonomic:new_arg(ArgName, Type, IsMandatory),
+                    argonomic:add_arg(SubCmd, Arg)
+                end,
+                _AccIn=argonomic:new_sub_cmd(SubCmdName),
+                ArgSpecList
+               ).
 
 %%% ============================================================================
 %%% Test Cases
@@ -69,10 +96,9 @@ end_per_testcase(_TestCaseName, _Config) ->
 %%% TODO 
 %%% Print description
 %%------------------------------------------------------------------------------
-t_unknown_sub_cmd(_Config) ->
+t_unknown_sub_cmd(Config) ->
     %% Arrange
-    SubCmd = new_sub_cmd_spec(some_sub_cmd),
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+    CmdSpec = proplists:get_value(cmd_spec, Config),
 
     %% Act
     UnknownSubCmd = "some_unknown_sub_command",
@@ -86,153 +112,114 @@ t_unknown_sub_cmd(_Config) ->
                  Result
                 ).
 
-new_sub_cmd_spec(SubCmdName) ->
-    lists:foldl(fun({ArgName, Type}, SubCmd) ->
-                    Arg = argonomic:new_arg(ArgName, Type, _IsMandatory=true),
-                    argonomic:add_arg(SubCmd, Arg)
-                end,
-                _AccIn=argonomic:new_sub_cmd(SubCmdName),
-                [{atom_arg, atom},
-                 {boolean_arg, boolean},
-                 {flag_arg, flag},
-                 {string_arg, string},
-                 {integer_arg, integer}
-                ]
-               ).
-
 %%------------------------------------------------------------------------------
-t_no_arg(_Config) ->
+t_no_arg(Config) ->
     %% Arrange
-    SubCmdName = some_sub_cmd,
-    SubCmd = argonomic:new_sub_cmd(SubCmdName),
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+    CmdSpec = proplists:get_value(cmd_spec, Config),
 
     %% Act
-    Args = ["some_sub_cmd"],
+    Args = ["sub_cmd3"],
     Result = argonomic:parse(CmdSpec, Args),
 
     %% Assert
-    ?assertEqual({SubCmdName, []}, Result).
+    ?assertEqual({sub_cmd3, []}, Result).
 
 %%------------------------------------------------------------------------------
-t_duplicated_args(_Config) ->
+t_duplicated_args(Config) ->
     %% Arrange
-    ArgName = arg1,
-    Arg = argonomic:new_arg(ArgName, _Type=boolean, _IsMandatory=true),
-    SubCmdName = some_sub_cmd,
-    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(SubCmdName), Arg),
-
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+    CmdSpec = proplists:get_value(cmd_spec, Config),
 
     %% Act
-    Args = ["some_sub_cmd",
-            "-arg1", "false",
-            "-arg1", "true"
+    Args = ["sub_cmd1",
+            "-boolean_arg", "false",
+            "-boolean_arg", "true"
            ],
     Result = (catch argonomic:parse(CmdSpec, Args)),
 
     %% Assert
     %% The parsed args will be removed from spec during parsing,
     %% so the second time the same arg is parsed it will be unknown.
-    ?assertEqual({'EXIT', {unknown_arg, ArgName}}, Result).
+    ?assertEqual({'EXIT', {unknown_arg, boolean_arg}}, Result).
 
 %%------------------------------------------------------------------------------
-t_unknown_arg(_Config) ->
+t_unknown_arg(Config) ->
     %% Arrange
-    SubCmdName1 = some_sub_cmd1,
-    SubCmd1 = new_sub_cmd_spec(SubCmdName1),
-
-    SubCmdName2 = some_sub_cmd2,
-    Cmd2ArgName = cmd2_arg,
-    Arg = argonomic:new_arg(Cmd2ArgName, _Type=boolean, _IsMandatory=true),
-    SubCmd2 = argonomic:add_arg(argonomic:new_sub_cmd(SubCmdName2), Arg),
-
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(),
-                                    [SubCmd1, SubCmd2]
-                                   ),
+    CmdSpec = proplists:get_value(cmd_spec, Config),
 
     %% Act
     %% -cmd2_arg is unknown to SubCmd1.
-    Args = ["some_sub_cmd1",
-            "-cmd2_arg", "false"
+    Args = ["sub_cmd2",
+            "-atom_arg", "b"
            ],
     Result = (catch argonomic:parse(CmdSpec, Args)),
 
     %% Assert
-    ?assertEqual({'EXIT', {unknown_arg, Cmd2ArgName}}, Result).
+    ?assertEqual({'EXIT', {unknown_arg, atom_arg}}, Result).
 
 %%------------------------------------------------------------------------------
-t_arg_types(_Config) ->
+t_arg_types(Config) ->
     %% Arrange
-    SubCmdName = some_sub_cmd,
-    SubCmd = new_sub_cmd_spec(SubCmdName),
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+    CmdSpec = proplists:get_value(cmd_spec, Config),
 
     %% Act
-    Args = ["some_sub_cmd",
+    Args = ["sub_cmd1",
             "-string_arg", "hello world",
             "-boolean_arg", "true",
-            "-atom_arg", "some_atom",
+            "-atom_arg", "c",
             "-flag_arg",
             "-integer_arg", "1234"
            ],
     Result = argonomic:parse(CmdSpec, Args),
 
     %% Assert
-    ?assertEqual({SubCmdName, [{string_arg, "hello world"},
-                               {boolean_arg, true},
-                               {atom_arg, some_atom},
-                               flag_arg,
-                               {integer_arg, 1234}
-                              ]},
+    ?assertEqual({sub_cmd1, [{string_arg, "hello world"},
+                             {boolean_arg, true},
+                             {atom_arg, c},
+                             flag_arg,
+                             {integer_arg, 1234}
+                            ]},
                  Result
                 ).
 
 %%------------------------------------------------------------------------------
-t_missing_mandatory_arg(_Config) ->
+t_missing_mandatory_arg(Config) ->
     %% Arrange
-    ArgName = some_arg_name,
-    MandatoryArg = argonomic:new_arg(ArgName, atom, _IsMandatory=true),
-    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(some_sub_cmd), MandatoryArg),
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+    CmdSpec = proplists:get_value(cmd_spec, Config),
 
     %% Act
-    Args = ["some_sub_cmd"],
-    Result = (catch argonomic:parse(CmdSpec, Args)),
-
-    %% Assert
-    ?assertEqual({'EXIT', {missing_mandatory_arg, ArgName}}, Result).
-
-%%------------------------------------------------------------------------------
-t_constraint_pass(_Config) ->
-    verify_constraint(_Verdict=pass).
-
-verify_constraint(Verdict) ->
-    %% Arrange
-    ArgName = arg1,
-    Constraint = fun(Value) -> lists:member(Value, [a,b,c]) end,
-    ArgSpec = argonomic:new_arg(ArgName,
-                                _ArgType = {atom, Constraint},
-                                _IsMandatory = true
-                               ),
-    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(some_sub_cmd), ArgSpec),
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
-
-    %% Act
-    {ArgValue, ExpectedResult} =
-        case Verdict of
-            pass -> {"b", {some_sub_cmd, [{arg1, b}]}};
-            fail -> {"d", {'EXIT', {failed_constraint_check, ArgName}}}
-        end,
-    Args = ["some_sub_cmd",
-            "-arg1", ArgValue
+    Args = ["sub_cmd2",
+            "-boolean_arg", "true"
            ],
     Result = (catch argonomic:parse(CmdSpec, Args)),
 
     %% Assert
-    ?assertEqual(ExpectedResult, Result).
+    ?assertEqual({'EXIT', {missing_mandatory_arg, integer_arg}}, Result).
 
 %%------------------------------------------------------------------------------
-t_constraint_fail(_Config) ->
-    verify_constraint(_Verdict=fail).
+t_constraint_pass(Config) ->
+    %% Arrange
+    CmdSpec = proplists:get_value(cmd_spec, Config),
+
+    %% Act
+    Args = ["sub_cmd2",
+            "-integer_arg", "20"
+           ],
+    Result = argonomic:parse(CmdSpec, Args),
+
+    %% Assert
+    ?assertEqual({sub_cmd2, [{integer_arg, 20}]}, Result).
+
+%%------------------------------------------------------------------------------
+t_constraint_fail(Config) ->
+    %% Arrange
+    CmdSpec = proplists:get_value(cmd_spec, Config),
+
+    %% Act
+    Args = ["sub_cmd2",
+            "-integer_arg", "5"
+           ],
+    Result = (catch argonomic:parse(CmdSpec, Args)),
+
+    %% Assert
+    ?assertEqual({'EXIT',{failed_constraint_check,integer_arg}}, Result).
 
