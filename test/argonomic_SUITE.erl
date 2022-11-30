@@ -23,7 +23,8 @@
          t_missing_mandatory_arg/1,
          t_constraint_pass/1,
          t_non_list_constraint_fail/1,
-         t_list_constraint_fail/1
+         t_list_constraint_fail/1,
+         t_print_cmd_help/1
         ]).
 
 %%% ============================================================================
@@ -67,29 +68,39 @@ end_per_testcase(_TestCaseName, _Config) ->
 new_cmd_spec() ->
     IsListTrue = true,
     IsListFalse = false,
-    Cmd1Args = [{atom_arg, {atom,fun(Value) -> lists:member(Value, [a,b,c]) end}, IsListTrue, mandatory},
-                {boolean_arg, boolean, IsListFalse, optional},
-                {flag_arg, flag, IsListFalse, mandatory},
-                {string_arg, string, IsListFalse, optional},
-                {integer_arg, integer, IsListFalse, mandatory}
+    Cmd1Args = [{atom_arg,
+                 {atom,fun(Value) -> lists:member(Value, [a,b,c]) end},
+                 IsListTrue,
+                 mandatory,
+                 "An atom arg which can contain multiple possible values: a, b, c."
+                },
+                {boolean_arg, boolean, IsListFalse, optional, "A boolean arg."},
+                {flag_arg, flag, IsListFalse, mandatory, "This is a flag without any value."},
+                {string_arg, string, IsListFalse, optional, "A string arg."},
+                {integer_arg, integer, IsListFalse, mandatory, "An integer arg."}
                ],
-    SubCmd1 = new_sub_cmd_spec(sub_cmd1, Cmd1Args),
+    SubCmd1 = new_sub_cmd_spec(sub_cmd1, Cmd1Args, "This sub command contains all possible argument types."),
 
-    Cmd2Args = [{boolean_arg, boolean, IsListFalse, optional},
-                {integer_arg, {integer, fun(Value) -> Value >= 10 end}, IsListFalse, mandatory}
+    Cmd2Args = [{boolean_arg, boolean, IsListFalse, optional, "Another boolean arg."},
+                {integer_arg,
+                 {integer, fun(Value) -> Value >= 10 end},
+                 IsListFalse,
+                 mandatory,
+                 "Another integer arg whose value is not smaller than 10."
+                }
                ],
-    SubCmd2 = new_sub_cmd_spec(sub_cmd2, Cmd2Args),
+    SubCmd2 = new_sub_cmd_spec(sub_cmd2, Cmd2Args, "This sub command is simpler."),
 
-    SubCmd3 = new_sub_cmd_spec(sub_cmd3, _NoArgs=[]),
+    SubCmd3 = new_sub_cmd_spec(sub_cmd3, _NoArgs=[], "This sub command has no args."),
 
     argonomic:add_sub_cmd(argonomic:new_cmd(), [SubCmd1, SubCmd2, SubCmd3]).
 
-new_sub_cmd_spec(SubCmdName, ArgSpecList) ->
-    lists:foldl(fun({ArgName, Type, IsList, Presence}, SubCmd) ->
-                    Arg = argonomic:new_arg(ArgName, Type, IsList, Presence),
+new_sub_cmd_spec(SubCmdName, ArgSpecList, SubCmdDescription) ->
+    lists:foldl(fun({ArgName, Type, IsList, Presence, ArgDescription}, SubCmd) ->
+                    Arg = argonomic:new_arg(ArgName, Type, IsList, Presence, ArgDescription),
                     argonomic:add_arg(SubCmd, Arg)
                 end,
-                _AccIn=argonomic:new_sub_cmd(SubCmdName),
+                _AccIn=argonomic:new_sub_cmd(SubCmdName, SubCmdDescription),
                 ArgSpecList
                ).
 
@@ -97,7 +108,6 @@ new_sub_cmd_spec(SubCmdName, ArgSpecList) ->
 %%% Test Cases
 %%% ============================================================================
 %%% TODO 
-%%% List args
 %%% Print description
 %%------------------------------------------------------------------------------
 t_unknown_sub_cmd(Config) ->
@@ -242,4 +252,15 @@ t_list_constraint_fail(Config) ->
 
     %% Assert
     ?assertEqual({'EXIT',{failed_constraint_check,atom_arg}}, Result).
+
+%%------------------------------------------------------------------------------
+t_print_cmd_help(Config) ->
+    %% Arrange
+    CmdSpec = proplists:get_value(cmd_spec, Config),
+
+    %% Act
+    Result = argonomic:get_help_msg(CmdSpec),
+
+    %% Assert
+    ?assertEqual("hello world", Result).
 

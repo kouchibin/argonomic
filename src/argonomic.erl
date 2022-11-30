@@ -5,11 +5,14 @@
 %% -----------------------------------------------------------------------------
 -export([
          new_cmd/0,
-         new_sub_cmd/1,
+         new_sub_cmd/2,
          add_sub_cmd/2,
-         new_arg/4,
+         new_arg/5,
          add_arg/2,
-         parse/2
+
+         parse/2,
+
+         get_help_msg/1
         ]).
 
 %% -----------------------------------------------------------------------------
@@ -52,10 +55,10 @@ new_cmd() ->
     maps:new().
 
 %%------------------------------------------------------------------------------
--spec new_sub_cmd(sub_command_name()) -> #sub_command{}.
+-spec new_sub_cmd(sub_command_name(), Description::string()) -> #sub_command{}.
 %%------------------------------------------------------------------------------
-new_sub_cmd(Name) ->
-    #sub_command{name=Name, args=maps:new()}.
+new_sub_cmd(Name, Description) ->
+    #sub_command{name=Name, args=maps:new(), description=Description}.
 
 %%------------------------------------------------------------------------------
 -spec add_sub_cmd(command(), #sub_command{} | [#sub_command{}]) -> command().
@@ -69,10 +72,20 @@ add_sub_cmd(Cmd, #sub_command{name=Name} = SubCmd) ->
     maps:put(Name, SubCmd, Cmd).
 
 %%------------------------------------------------------------------------------
--spec new_arg(arg_name(), arg_type(), IsList::boolean(), presence()) -> #arg{}.
+-spec new_arg(Name, Type, IsList, Presence, Description) -> #arg{} when
+      Name        :: arg_name(),
+      Type        :: arg_type(),
+      IsList      :: boolean(),
+      Presence    :: presence(),
+      Description :: string().
 %%------------------------------------------------------------------------------
-new_arg(Name, Type, IsList, Presence) ->
-    #arg{name=Name, type=Type, is_list=IsList, presence=Presence}.
+new_arg(Name, Type, IsList, Presence, Description) ->
+    #arg{name = Name,
+         type = Type,
+         is_list = IsList,
+         presence = Presence,
+         description = Description
+        }.
 
 %%------------------------------------------------------------------------------
 -spec add_arg(#sub_command{}, #arg{} | [#arg{}]) -> #sub_command{}.
@@ -93,6 +106,12 @@ parse(CmdSpec, [SubCmdStr|ArgStrs]) ->
     SubCmdSpec = get_mandatory_val(SubCmdName, CmdSpec, unknown_sub_command),
     ParsedArgs = parse_args(SubCmdSpec, ArgStrs),
     {SubCmdName, ParsedArgs}.
+
+%%------------------------------------------------------------------------------
+-spec get_help_msg(command()) -> string().
+%%------------------------------------------------------------------------------
+get_help_msg(_CmdSpec) ->
+    "hello world".
 
 %% -----------------------------------------------------------------------------
 %% Internal Functions
@@ -151,35 +170,13 @@ parse_value(#arg{name=FlagName, type=flag}, Rest) ->
     {FlagName, Rest};
 parse_value(#arg{name=Name, is_list=IsList} = ArgSpec, Rest) ->
     {ParsedValue, NewRest} =
-                case IsList of
-                    true ->
-                        parse_list_value(ArgSpec, Rest, _Parsed=[]);
-                    false ->
-                        [Next | Remaining] = Rest,
-                        {parse_single_value(ArgSpec, Next), Remaining}
-                end,
-        % end,
-        % case Type of
-        %     {PrimitiveType, Constraint} ->
-        %         {Value, Remaining} = parse_value(PrimitiveType, IsList, Rest),
-        %         %% Consider list.
-        %         case Constraint(Value) of
-        %             true ->
-        %                 Value;
-        %             false ->
-        %                 abort(failed_constraint_check, Name)
-        %         end,
-        %         {Value, Remaining};
-        %     PrimitiveType ->
-        %         case IsList of
-        %             true ->
-        %                 parse_list_value(PrimitiveType, Rest, _Parsed=[]);
-        %             false ->
-        %                 [Next | Remaining] = Rest,
-        %                 Value = parse_primitive_value(PrimitiveType, Next),
-        %                 {Value, Remaining}
-        %         end
-        % end,
+        case IsList of
+            true ->
+                parse_list_value(ArgSpec, Rest, _Parsed=[]);
+            false ->
+                [Next | Remaining] = Rest,
+                {parse_single_value(ArgSpec, Next), Remaining}
+        end,
     {{Name, ParsedValue}, NewRest}.
 
 parse_list_value(_ArgSpec, [[$-|_NextArgName] | _] = Rest, ParsedValues) ->
@@ -209,6 +206,9 @@ parse_primitive_value(PrimitiveType, Str) ->
         integer -> list_to_integer(Str)
     end.
 
+%%------------------------------------------------------------------------------
+-spec abort(ErrorMsg::term(), Details::term()) -> no_return().
+%%------------------------------------------------------------------------------
 abort(ErrorMsg, Details) ->
     io:format("Error - ~p: ~p.~n", [ErrorMsg, Details]),
     exit({ErrorMsg, Details}).
