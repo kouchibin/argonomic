@@ -22,7 +22,8 @@
          t_arg_types/1,
          t_missing_mandatory_arg/1,
          t_constraint_pass/1,
-         t_constraint_fail/1
+         t_non_list_constraint_fail/1,
+         t_list_constraint_fail/1
         ]).
 
 %%% ============================================================================
@@ -213,7 +214,7 @@ t_constraint_pass(Config) ->
     ?assertEqual({sub_cmd2, [{integer_arg, 20}]}, Result).
 
 %%------------------------------------------------------------------------------
-t_constraint_fail(Config) ->
+t_non_list_constraint_fail(Config) ->
     %% Arrange
     CmdSpec = proplists:get_value(cmd_spec, Config),
 
@@ -225,4 +226,20 @@ t_constraint_fail(Config) ->
 
     %% Assert
     ?assertEqual({'EXIT',{failed_constraint_check,integer_arg}}, Result).
+
+%%------------------------------------------------------------------------------
+t_list_constraint_fail(Config) ->
+    %% Arrange
+    CmdSpec = proplists:get_value(cmd_spec, Config),
+
+    %% Act
+    Args = ["sub_cmd1",
+            "-atom_arg", "c", "b", "d",
+            "-flag_arg",
+            "-integer_arg", "1234"
+           ],
+    Result = (catch argonomic:parse(CmdSpec, Args)),
+
+    %% Assert
+    ?assertEqual({'EXIT',{failed_constraint_check,atom_arg}}, Result).
 
