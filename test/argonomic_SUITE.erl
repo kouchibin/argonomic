@@ -68,7 +68,7 @@ end_per_testcase(_TestCaseName, _Config) ->
 %%% ============================================================================
 %%% TODO 
 %%% Print description
-%%% Constraint
+%%------------------------------------------------------------------------------
 t_unknown_sub_cmd(_Config) ->
     %% Arrange
     SubCmd = new_sub_cmd_spec(some_sub_cmd),
@@ -86,6 +86,21 @@ t_unknown_sub_cmd(_Config) ->
                  Result
                 ).
 
+new_sub_cmd_spec(SubCmdName) ->
+    lists:foldl(fun({ArgName, Type}, SubCmd) ->
+                    Arg = argonomic:new_arg(ArgName, Type, _IsMandatory=true),
+                    argonomic:add_arg(SubCmd, Arg)
+                end,
+                _AccIn=argonomic:new_sub_cmd(SubCmdName),
+                [{atom_arg, atom},
+                 {boolean_arg, boolean},
+                 {flag_arg, flag},
+                 {string_arg, string},
+                 {integer_arg, integer}
+                ]
+               ).
+
+%%------------------------------------------------------------------------------
 t_no_arg(_Config) ->
     %% Arrange
     SubCmdName = some_sub_cmd,
@@ -99,6 +114,7 @@ t_no_arg(_Config) ->
     %% Assert
     ?assertEqual({SubCmdName, []}, Result).
 
+%%------------------------------------------------------------------------------
 t_duplicated_args(_Config) ->
     %% Arrange
     ArgName = arg1,
@@ -120,6 +136,7 @@ t_duplicated_args(_Config) ->
     %% so the second time the same arg is parsed it will be unknown.
     ?assertEqual({'EXIT', {unknown_arg, ArgName}}, Result).
 
+%%------------------------------------------------------------------------------
 t_unknown_arg(_Config) ->
     %% Arrange
     SubCmdName1 = some_sub_cmd1,
@@ -144,20 +161,7 @@ t_unknown_arg(_Config) ->
     %% Assert
     ?assertEqual({'EXIT', {unknown_arg, Cmd2ArgName}}, Result).
 
-new_sub_cmd_spec(SubCmdName) ->
-    lists:foldl(fun({ArgName, Type}, SubCmd) ->
-                    Arg = argonomic:new_arg(ArgName, Type, _IsMandatory=true),
-                    argonomic:add_arg(SubCmd, Arg)
-                end,
-                _AccIn=argonomic:new_sub_cmd(SubCmdName),
-                [{atom_arg, atom},
-                 {boolean_arg, boolean},
-                 {flag_arg, flag},
-                 {string_arg, string},
-                 {integer_arg, integer}
-                ]
-               ).
-
+%%------------------------------------------------------------------------------
 t_arg_types(_Config) ->
     %% Arrange
     SubCmdName = some_sub_cmd,
@@ -184,6 +188,7 @@ t_arg_types(_Config) ->
                  Result
                 ).
 
+%%------------------------------------------------------------------------------
 t_missing_mandatory_arg(_Config) ->
     %% Arrange
     ArgName = some_arg_name,
@@ -198,11 +203,9 @@ t_missing_mandatory_arg(_Config) ->
     %% Assert
     ?assertEqual({'EXIT', {missing_mandatory_arg, ArgName}}, Result).
 
+%%------------------------------------------------------------------------------
 t_constraint_pass(_Config) ->
     verify_constraint(_Verdict=pass).
-
-t_constraint_fail(_Config) ->
-    verify_constraint(_Verdict=fail).
 
 verify_constraint(Verdict) ->
     %% Arrange
@@ -228,4 +231,8 @@ verify_constraint(Verdict) ->
 
     %% Assert
     ?assertEqual(ExpectedResult, Result).
+
+%%------------------------------------------------------------------------------
+t_constraint_fail(_Config) ->
+    verify_constraint(_Verdict=fail).
 
