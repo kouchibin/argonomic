@@ -21,7 +21,8 @@
          t_unknown_arg/1,
          t_arg_types/1,
          t_missing_mandatory_arg/1,
-         t_constraint_ok/1
+         t_constraint_pass/1,
+         t_constraint_fail/1
         ]).
 
 %%% ============================================================================
@@ -197,22 +198,34 @@ t_missing_mandatory_arg(_Config) ->
     %% Assert
     ?assertEqual({'EXIT', {missing_mandatory_arg, ArgName}}, Result).
 
-t_constraint_ok(_Config) ->
+t_constraint_pass(_Config) ->
+    verify_constraint(_Verdict=pass).
+
+t_constraint_fail(_Config) ->
+    verify_constraint(_Verdict=fail).
+
+verify_constraint(Verdict) ->
     %% Arrange
-    Constraint = fun(Value) -> lists:member(Value, [a, b, c]) end,
-    MandatoryArg = argonomic:new_arg(_ArgName = arg1,
-                                     _ArgType = {atom, Constraint},
-                                     _IsMandatory = true
-                                    ),
-    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(some_sub_cmd), MandatoryArg),
+    ArgName = arg1,
+    Constraint = fun(Value) -> lists:member(Value, [a,b,c]) end,
+    ArgSpec = argonomic:new_arg(ArgName,
+                                _ArgType = {atom, Constraint},
+                                _IsMandatory = true
+                               ),
+    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(some_sub_cmd), ArgSpec),
     CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
 
     %% Act
+    {ArgValue, ExpectedResult} =
+        case Verdict of
+            pass -> {"b", {some_sub_cmd, [{arg1, b}]}};
+            fail -> {"d", {'EXIT', {failed_constraint_check, ArgName}}}
+        end,
     Args = ["some_sub_cmd",
-            "-arg1", "b"
+            "-arg1", ArgValue
            ],
-    Result = argonomic:parse(CmdSpec, Args),
+    Result = (catch argonomic:parse(CmdSpec, Args)),
 
     %% Assert
-    ?assertEqual({some_sub_cmd, [{arg1, b}]}, Result).
+    ?assertEqual(ExpectedResult, Result).
 
