@@ -64,16 +64,18 @@ end_per_testcase(_TestCaseName, _Config) ->
     ok.
 
 new_cmd_spec() ->
-    Cmd1Args = [{atom_arg, {atom,fun(Value) -> lists:member(Value, [a,b,c]) end}, mandatory},
-                {boolean_arg, boolean, optional},
-                {flag_arg, flag, mandatory},
-                {string_arg, string, optional},
-                {integer_arg, integer, mandatory}
+    IsListTrue = true,
+    IsListFalse = false,
+    Cmd1Args = [{atom_arg, {atom,fun(Value) -> lists:member(Value, [a,b,c]) end}, IsListTrue, mandatory},
+                {boolean_arg, boolean, IsListFalse, optional},
+                {flag_arg, flag, IsListFalse, mandatory},
+                {string_arg, string, IsListFalse, optional},
+                {integer_arg, integer, IsListFalse, mandatory}
                ],
     SubCmd1 = new_sub_cmd_spec(sub_cmd1, Cmd1Args),
 
-    Cmd2Args = [{boolean_arg, boolean, optional},
-                {integer_arg, {integer, fun(Value) -> Value >= 10 end}, mandatory}
+    Cmd2Args = [{boolean_arg, boolean, IsListFalse, optional},
+                {integer_arg, {integer, fun(Value) -> Value >= 10 end}, IsListFalse, mandatory}
                ],
     SubCmd2 = new_sub_cmd_spec(sub_cmd2, Cmd2Args),
 
@@ -82,8 +84,8 @@ new_cmd_spec() ->
     argonomic:add_sub_cmd(argonomic:new_cmd(), [SubCmd1, SubCmd2, SubCmd3]).
 
 new_sub_cmd_spec(SubCmdName, ArgSpecList) ->
-    lists:foldl(fun({ArgName, Type, Presence}, SubCmd) ->
-                    Arg = argonomic:new_arg(ArgName, Type, Presence),
+    lists:foldl(fun({ArgName, Type, IsList, Presence}, SubCmd) ->
+                    Arg = argonomic:new_arg(ArgName, Type, IsList, Presence),
                     argonomic:add_arg(SubCmd, Arg)
                 end,
                 _AccIn=argonomic:new_sub_cmd(SubCmdName),
@@ -166,7 +168,7 @@ t_arg_types(Config) ->
     Args = ["sub_cmd1",
             "-string_arg", "hello world",
             "-boolean_arg", "true",
-            "-atom_arg", "c",
+            "-atom_arg", "c", "b", "a",
             "-flag_arg",
             "-integer_arg", "1234"
            ],
@@ -175,7 +177,7 @@ t_arg_types(Config) ->
     %% Assert
     ?assertEqual({sub_cmd1, [{string_arg, "hello world"},
                              {boolean_arg, true},
-                             {atom_arg, c},
+                             {atom_arg, [c, b, a]},
                              flag_arg,
                              {integer_arg, 1234}
                             ]},

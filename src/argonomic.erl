@@ -7,7 +7,7 @@
          new_cmd/0,
          new_sub_cmd/1,
          add_sub_cmd/2,
-         new_arg/3,
+         new_arg/4,
          add_arg/2,
          parse/2
         ]).
@@ -69,10 +69,10 @@ add_sub_cmd(Cmd, #sub_command{name=Name} = SubCmd) ->
     maps:put(Name, SubCmd, Cmd).
 
 %%------------------------------------------------------------------------------
--spec new_arg(arg_name(), arg_type(), presence()) -> #arg{}.
+-spec new_arg(arg_name(), arg_type(), IsList::boolean(), presence()) -> #arg{}.
 %%------------------------------------------------------------------------------
-new_arg(Name, Type, Presence) ->
-    #arg{name=Name, type=Type, presence=Presence}.
+new_arg(Name, Type, IsList, Presence) ->
+    #arg{name=Name, type=Type, is_list=IsList, presence=Presence}.
 
 %%------------------------------------------------------------------------------
 -spec add_arg(#sub_command{}, #arg{} | [#arg{}]) -> #sub_command{}.
@@ -149,20 +149,57 @@ get_mandatory_val(Key, Map, ErrorMsg) ->
 %%------------------------------------------------------------------------------
 parse_value(#arg{name=FlagName, type=flag}, Rest) ->
     {FlagName, Rest};
-parse_value(#arg{name=Name, type=Type}, [Next | Rest]) ->
-    ParsedValue = case Type of
-                      {PrimitiveType, Constraint} ->
-                          Value = parse_primitive_value(PrimitiveType, Next),
-                          case Constraint(Value) of
-                              true ->
-                                  Value;
-                              false ->
-                                  abort(failed_constraint_check, Name)
-                          end;
-                      PrimitiveType ->
-                          parse_primitive_value(PrimitiveType, Next)
-                  end,
-    {{Name, ParsedValue}, Rest}.
+parse_value(#arg{name=Name, is_list=IsList} = ArgSpec, Rest) ->
+    {ParsedValue, NewRest} =
+                case IsList of
+                    true ->
+                        parse_list_value(ArgSpec, Rest, _Parsed=[]);
+                    false ->
+                        [Next | Remaining] = Rest,
+                        {parse_single_value(ArgSpec, Next), Remaining}
+                end,
+        % end,
+        % case Type of
+        %     {PrimitiveType, Constraint} ->
+        %         {Value, Remaining} = parse_value(PrimitiveType, IsList, Rest),
+        %         %% Consider list.
+        %         case Constraint(Value) of
+        %             true ->
+        %                 Value;
+        %             false ->
+        %                 abort(failed_constraint_check, Name)
+        %         end,
+        %         {Value, Remaining};
+        %     PrimitiveType ->
+        %         case IsList of
+        %             true ->
+        %                 parse_list_value(PrimitiveType, Rest, _Parsed=[]);
+        %             false ->
+        %                 [Next | Remaining] = Rest,
+        %                 Value = parse_primitive_value(PrimitiveType, Next),
+        %                 {Value, Remaining}
+        %         end
+        % end,
+    {{Name, ParsedValue}, NewRest}.
+
+parse_list_value(_ArgSpec, [[$-|_NextArgName] | _] = Rest, ParsedValues) ->
+    {lists:reverse(ParsedValues), Rest};
+parse_list_value(ArgSpec, [Str | Rest], ParsedValues) ->
+    Value = parse_single_value(ArgSpec, Str),
+    parse_list_value(ArgSpec, Rest, [Value|ParsedValues]).
+
+parse_single_value(#arg{name=Name, type=Type}, Str) ->
+    case Type of
+        {PrimitiveType, Constraint} ->
+            Value = parse_primitive_value(PrimitiveType, Str),
+            case Constraint(Value) of
+                true  -> Value;
+                false -> abort(failed_constraint_check, Name)
+            end,
+            Value;
+        PrimitiveType ->
+            parse_primitive_value(PrimitiveType, Str)
+    end.
 
 parse_primitive_value(PrimitiveType, Str) ->
     case PrimitiveType of
