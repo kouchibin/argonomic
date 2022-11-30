@@ -12,6 +12,7 @@
 
          parse/2,
 
+         print_help_msg/1,
          get_help_msg/1
         ]).
 
@@ -108,10 +109,19 @@ parse(CmdSpec, [SubCmdStr|ArgStrs]) ->
     {SubCmdName, ParsedArgs}.
 
 %%------------------------------------------------------------------------------
--spec get_help_msg(command()) -> string().
+-spec print_help_msg(#sub_command{} | command()) -> any().
 %%------------------------------------------------------------------------------
-get_help_msg(_CmdSpec) ->
-    "hello world".
+print_help_msg(Spec) ->
+    io:format(get_help_msg(Spec)).
+
+%%------------------------------------------------------------------------------
+-spec get_help_msg(#sub_command{} | command()) -> string().
+%%------------------------------------------------------------------------------
+get_help_msg(#sub_command{args=Args, description=Description}) ->
+    io_lib:format("~s~n~n~s", [Description, get_help_msg(Args)]);
+get_help_msg(CmdSpec) ->
+    SubCmds = maps:values(CmdSpec),
+    lists:flatmap(fun format_spec/1, SubCmds).
 
 %% -----------------------------------------------------------------------------
 %% Internal Functions
@@ -212,4 +222,24 @@ parse_primitive_value(PrimitiveType, Str) ->
 abort(ErrorMsg, Details) ->
     io:format("Error - ~p: ~p.~n", [ErrorMsg, Details]),
     exit({ErrorMsg, Details}).
+
+format_spec(#sub_command{name=Name, description=Description}) ->
+    io_lib:format("~-20.. s ~s~n", [atom_to_list(Name), Description]);
+format_spec(#arg{} = ArgSpec) ->
+    #arg{name = Name,
+         type = Type,
+         presence = Presence,
+         description = Description
+        } = ArgSpec,
+    ArgStr = "-" ++ atom_to_list(Name),
+    NewArgStr = case Presence of
+                    mandatory -> ArgStr;
+                    optional  -> "[" ++ ArgStr ++ "]"
+                end,
+            
+    PrimitiveType = get_primitive_type(Type),
+    io_lib:format("~-20.. s ~-10.. s ~s~n", [NewArgStr, PrimitiveType, Description]).
+
+get_primitive_type({PrimitiveType, _Constraint}) -> PrimitiveType;
+get_primitive_type(PrimitiveType)                -> PrimitiveType.
 

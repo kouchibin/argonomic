@@ -23,8 +23,7 @@
          t_missing_mandatory_arg/1,
          t_constraint_pass/1,
          t_non_list_constraint_fail/1,
-         t_list_constraint_fail/1,
-         t_print_cmd_help/1
+         t_list_constraint_fail/1
         ]).
 
 %%% ============================================================================
@@ -252,15 +251,4 @@ t_list_constraint_fail(Config) ->
 
     %% Assert
     ?assertEqual({'EXIT',{failed_constraint_check,atom_arg}}, Result).
-
-%%------------------------------------------------------------------------------
-t_print_cmd_help(Config) ->
-    %% Arrange
-    CmdSpec = proplists:get_value(cmd_spec, Config),
-
-    %% Act
-    Result = argonomic:get_help_msg(CmdSpec),
-
-    %% Assert
-    ?assertEqual("hello world", Result).
 
