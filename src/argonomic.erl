@@ -122,12 +122,8 @@ check_if_missing_mandatory_arg(ArgSpecs) ->
     lists:foreach(
       fun({ArgName, #arg{is_mandatory=IsMandatory}}) ->
                case IsMandatory of
-                   true ->
-                     Reason = missing_mandatory_arg,
-                     io:format("Error - ~p: ~p.~n", [Reason, ArgName]),
-                     exit({Reason, ArgName});
-                   false ->
-                       ok
+                   true  -> abort(missing_mandatory_arg, ArgName);
+                   false -> ok
                end
        end,
        maps:to_list(ArgSpecs)
@@ -142,11 +138,8 @@ check_if_missing_mandatory_arg(ArgSpecs) ->
 %%------------------------------------------------------------------------------
 get_mandatory_val(Key, Map, ErrorMsg) ->
     case maps:get(Key, Map, ErrorMsg) of
-        ErrorMsg ->
-            io:format("Error - ~p: ~p.~n", [ErrorMsg, Key]),
-            exit(ErrorMsg);
-        Value ->
-            Value
+        ErrorMsg -> abort(ErrorMsg, Key);
+        Value    -> Value
     end.
 
 %%------------------------------------------------------------------------------
@@ -155,11 +148,29 @@ get_mandatory_val(Key, Map, ErrorMsg) ->
 parse_value(#arg{name=FlagName, type=flag}, Rest) ->
     {FlagName, Rest};
 parse_value(#arg{name=Name, type=Type}, [Next | Rest]) ->
-    Value = case Type of
-                boolean -> list_to_atom(Next);
-                string  -> Next;
-                atom    -> list_to_atom(Next);
-                integer -> list_to_integer(Next)
-            end,
-    {{Name, Value}, Rest}.
+    ParsedValue = case Type of
+                      {PrimitiveType, Constraint} ->
+                          Value = parse_primitive_value(PrimitiveType, Next),
+                          case Constraint(Value) of
+                              true ->
+                                  Value;
+                              false ->
+                                  abort(failed_constraint_check, Name)
+                          end;
+                      PrimitiveType ->
+                          parse_primitive_value(PrimitiveType, Next)
+                  end,
+    {{Name, ParsedValue}, Rest}.
+
+parse_primitive_value(PrimitiveType, Str) ->
+    case PrimitiveType of
+        boolean -> list_to_atom(Str);
+        string  -> Str;
+        atom    -> list_to_atom(Str);
+        integer -> list_to_integer(Str)
+    end.
+
+abort(ErrorMsg, Details) ->
+    io:format("Error - ~p: ~p.~n", [ErrorMsg, Details]),
+    exit({ErrorMsg, Details}).
 

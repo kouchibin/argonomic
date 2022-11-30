@@ -20,7 +20,8 @@
          t_duplicated_args/1,
          t_unknown_arg/1,
          t_arg_types/1,
-         t_missing_mandatory_arg/1
+         t_missing_mandatory_arg/1,
+         t_constraint_ok/1
         ]).
 
 %%% ============================================================================
@@ -73,13 +74,16 @@ t_unknown_sub_cmd(_Config) ->
     CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
 
     %% Act
-    Args = ["some_unknown_sub_command",
+    UnknownSubCmd = "some_unknown_sub_command",
+    Args = [UnknownSubCmd,
             "-atom_arg", "some_atom"
            ],
     Result = (catch argonomic:parse(CmdSpec, Args)),
     
     %% Assert
-    ?assertEqual({'EXIT', unknown_sub_command}, Result).
+    ?assertEqual({'EXIT', {unknown_sub_command, list_to_atom(UnknownSubCmd)}},
+                 Result
+                ).
 
 t_no_arg(_Config) ->
     %% Arrange
@@ -96,7 +100,8 @@ t_no_arg(_Config) ->
 
 t_duplicated_args(_Config) ->
     %% Arrange
-    Arg = argonomic:new_arg(_Name=arg1, _Type=boolean, _IsMandatory=true),
+    ArgName = arg1,
+    Arg = argonomic:new_arg(ArgName, _Type=boolean, _IsMandatory=true),
     SubCmdName = some_sub_cmd,
     SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(SubCmdName), Arg),
 
@@ -110,7 +115,9 @@ t_duplicated_args(_Config) ->
     Result = (catch argonomic:parse(CmdSpec, Args)),
 
     %% Assert
-    ?assertEqual({'EXIT', unknown_arg}, Result).
+    %% The parsed args will be removed from spec during parsing,
+    %% so the second time the same arg is parsed it will be unknown.
+    ?assertEqual({'EXIT', {unknown_arg, ArgName}}, Result).
 
 t_unknown_arg(_Config) ->
     %% Arrange
@@ -118,7 +125,8 @@ t_unknown_arg(_Config) ->
     SubCmd1 = new_sub_cmd_spec(SubCmdName1),
 
     SubCmdName2 = some_sub_cmd2,
-    Arg = argonomic:new_arg(_Name=cmd2_arg, _Type=boolean, _IsMandatory=true),
+    Cmd2ArgName = cmd2_arg,
+    Arg = argonomic:new_arg(Cmd2ArgName, _Type=boolean, _IsMandatory=true),
     SubCmd2 = argonomic:add_arg(argonomic:new_sub_cmd(SubCmdName2), Arg),
 
     CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(),
@@ -133,7 +141,7 @@ t_unknown_arg(_Config) ->
     Result = (catch argonomic:parse(CmdSpec, Args)),
 
     %% Assert
-    ?assertEqual({'EXIT', unknown_arg}, Result).
+    ?assertEqual({'EXIT', {unknown_arg, Cmd2ArgName}}, Result).
 
 new_sub_cmd_spec(SubCmdName) ->
     lists:foldl(fun({ArgName, Type}, SubCmd) ->
@@ -188,3 +196,23 @@ t_missing_mandatory_arg(_Config) ->
 
     %% Assert
     ?assertEqual({'EXIT', {missing_mandatory_arg, ArgName}}, Result).
+
+t_constraint_ok(_Config) ->
+    %% Arrange
+    Constraint = fun(Value) -> lists:member(Value, [a, b, c]) end,
+    MandatoryArg = argonomic:new_arg(_ArgName = arg1,
+                                     _ArgType = {atom, Constraint},
+                                     _IsMandatory = true
+                                    ),
+    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(some_sub_cmd), MandatoryArg),
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+
+    %% Act
+    Args = ["some_sub_cmd",
+            "-arg1", "b"
+           ],
+    Result = argonomic:parse(CmdSpec, Args),
+
+    %% Assert
+    ?assertEqual({some_sub_cmd, [{arg1, b}]}, Result).
+
