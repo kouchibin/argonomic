@@ -15,13 +15,13 @@
 
 %% Test cases
 -export([
-         t_no_arg/1,
          t_unknown_sub_cmd/1,
+         t_no_arg/1,
+         t_duplicated_args/1,
          t_unknown_arg/1,
          t_arg_types/1,
          t_missing_mandatory_arg/1
         ]).
-
 
 %%% ============================================================================
 %%% Include files
@@ -65,23 +65,8 @@ end_per_testcase(_TestCaseName, _Config) ->
 %%% Test Cases
 %%% ============================================================================
 %%% TODO 
-%%% duplicated args
-%%% mandatory arg missing
 %%% Print description
 %%% Constraint
-t_no_arg(_Config) ->
-    %% Arrange
-    SubCmdName = some_sub_cmd,
-    SubCmd = argonomic:new_sub_cmd(SubCmdName),
-    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
-
-    %% Act
-    Args = ["some_sub_cmd"],
-    Result = argonomic:parse(CmdSpec, Args),
-
-    %% Assert
-    ?assertEqual({SubCmdName, []}, Result).
-
 t_unknown_sub_cmd(_Config) ->
     %% Arrange
     SubCmd = new_sub_cmd_spec(some_sub_cmd),
@@ -95,6 +80,37 @@ t_unknown_sub_cmd(_Config) ->
     
     %% Assert
     ?assertEqual({'EXIT', unknown_sub_command}, Result).
+
+t_no_arg(_Config) ->
+    %% Arrange
+    SubCmdName = some_sub_cmd,
+    SubCmd = argonomic:new_sub_cmd(SubCmdName),
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+
+    %% Act
+    Args = ["some_sub_cmd"],
+    Result = argonomic:parse(CmdSpec, Args),
+
+    %% Assert
+    ?assertEqual({SubCmdName, []}, Result).
+
+t_duplicated_args(_Config) ->
+    %% Arrange
+    Arg = argonomic:new_arg(_Name=arg1, _Type=boolean, _IsMandatory=true),
+    SubCmdName = some_sub_cmd,
+    SubCmd = argonomic:add_arg(argonomic:new_sub_cmd(SubCmdName), Arg),
+
+    CmdSpec = argonomic:add_sub_cmd(argonomic:new_cmd(), SubCmd),
+
+    %% Act
+    Args = ["some_sub_cmd",
+            "-arg1", "false",
+            "-arg1", "true"
+           ],
+    Result = (catch argonomic:parse(CmdSpec, Args)),
+
+    %% Assert
+    ?assertEqual({'EXIT', unknown_arg}, Result).
 
 t_unknown_arg(_Config) ->
     %% Arrange
