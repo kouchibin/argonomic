@@ -64,16 +64,16 @@ end_per_testcase(_TestCaseName, _Config) ->
     ok.
 
 new_cmd_spec() ->
-    Cmd1Args = [{atom_arg, {atom,fun(Value) -> lists:member(Value, [a,b,c]) end}, true},
-                {boolean_arg, boolean, false},
-                {flag_arg, flag, true},
-                {string_arg, string, false},
-                {integer_arg, integer, true}
+    Cmd1Args = [{atom_arg, {atom,fun(Value) -> lists:member(Value, [a,b,c]) end}, mandatory},
+                {boolean_arg, boolean, optional},
+                {flag_arg, flag, mandatory},
+                {string_arg, string, optional},
+                {integer_arg, integer, mandatory}
                ],
     SubCmd1 = new_sub_cmd_spec(sub_cmd1, Cmd1Args),
 
-    Cmd2Args = [{boolean_arg, boolean, false},
-                {integer_arg, {integer, fun(Value) -> Value >= 10 end}, true}
+    Cmd2Args = [{boolean_arg, boolean, optional},
+                {integer_arg, {integer, fun(Value) -> Value >= 10 end}, mandatory}
                ],
     SubCmd2 = new_sub_cmd_spec(sub_cmd2, Cmd2Args),
 
@@ -82,8 +82,8 @@ new_cmd_spec() ->
     argonomic:add_sub_cmd(argonomic:new_cmd(), [SubCmd1, SubCmd2, SubCmd3]).
 
 new_sub_cmd_spec(SubCmdName, ArgSpecList) ->
-    lists:foldl(fun({ArgName, Type, IsMandatory}, SubCmd) ->
-                    Arg = argonomic:new_arg(ArgName, Type, IsMandatory),
+    lists:foldl(fun({ArgName, Type, Presence}, SubCmd) ->
+                    Arg = argonomic:new_arg(ArgName, Type, Presence),
                     argonomic:add_arg(SubCmd, Arg)
                 end,
                 _AccIn=argonomic:new_sub_cmd(SubCmdName),
@@ -94,6 +94,7 @@ new_sub_cmd_spec(SubCmdName, ArgSpecList) ->
 %%% Test Cases
 %%% ============================================================================
 %%% TODO 
+%%% List args
 %%% Print description
 %%------------------------------------------------------------------------------
 t_unknown_sub_cmd(Config) ->

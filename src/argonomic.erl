@@ -15,10 +15,11 @@
 %% -----------------------------------------------------------------------------
 %% Definitions
 %% -----------------------------------------------------------------------------
--record(arg, {name         :: arg_name(),
-              type         :: arg_type(),
-              is_mandatory :: boolean(),
-              description  :: string()
+-record(arg, {name            :: arg_name(),
+              type            :: arg_type(),
+              is_list = false :: boolean(),
+              presence        :: presence(),
+              description     :: string()
              }).
 
 -record(sub_command, {name        :: sub_command_name(),
@@ -28,6 +29,7 @@
 
 -type arg_name()         :: atom().
 -type sub_command_name() :: atom().
+-type presence()         :: mandatory | optional.
 
 -type command() :: #{sub_command_name() => #sub_command{}}.
 
@@ -67,10 +69,10 @@ add_sub_cmd(Cmd, #sub_command{name=Name} = SubCmd) ->
     maps:put(Name, SubCmd, Cmd).
 
 %%------------------------------------------------------------------------------
--spec new_arg(arg_name(), arg_type(), IsMandatory::boolean()) -> #arg{}.
+-spec new_arg(arg_name(), arg_type(), presence()) -> #arg{}.
 %%------------------------------------------------------------------------------
-new_arg(Name, Type, IsMandatory) ->
-    #arg{name=Name, type=Type, is_mandatory=IsMandatory}.
+new_arg(Name, Type, Presence) ->
+    #arg{name=Name, type=Type, presence=Presence}.
 
 %%------------------------------------------------------------------------------
 -spec add_arg(#sub_command{}, #arg{} | [#arg{}]) -> #sub_command{}.
@@ -120,10 +122,10 @@ parse_args_help(SubCmdSpec, _ArgStrs=[[$-|ArgStr] | Rest], ParsedResult) ->
 %%------------------------------------------------------------------------------
 check_if_missing_mandatory_arg(ArgSpecs) ->
     lists:foreach(
-      fun({ArgName, #arg{is_mandatory=IsMandatory}}) ->
-               case IsMandatory of
-                   true  -> abort(missing_mandatory_arg, ArgName);
-                   false -> ok
+      fun({ArgName, #arg{presence=Presence}}) ->
+               case Presence of
+                   mandatory -> abort(missing_mandatory_arg, ArgName);
+                   optional  -> ok
                end
        end,
        maps:to_list(ArgSpecs)
